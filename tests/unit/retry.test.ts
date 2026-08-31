@@ -34,13 +34,17 @@ describe('Retry Logic', () => {
 
   it('retries on 500 then succeeds', async () => {
     nock(API_BASE).post('/v1/chat/completions').reply(500);
-    nock(API_BASE).post('/v1/chat/completions').reply(200, {
-      id: 'chatcmpl-1',
-      object: 'chat.completion',
-      created: 1,
-      model: 'auto',
-      choices: [{ index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
-    });
+    nock(API_BASE)
+      .post('/v1/chat/completions')
+      .reply(200, {
+        id: 'chatcmpl-1',
+        object: 'chat.completion',
+        created: 1,
+        model: 'auto',
+        choices: [
+          { index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' },
+        ],
+      });
 
     const response: any = await client.chat.completions.create({
       model: 'auto',

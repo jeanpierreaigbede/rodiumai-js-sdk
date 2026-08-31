@@ -3,29 +3,49 @@ import fetch, { Response } from 'node-fetch';
 import { VERSION } from './_version.js';
 import {
   NetworkError,
+  RateLimitError,
   RodiumAIError,
   TimeoutError,
   mapHttpStatus,
 } from './errors.js';
 
-function extractBackendError(data: Record<string, unknown>): string | null {
-  const err = data.error;
+function extractBackendError(data: unknown): { message: string | null; code: string | null } {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    return { message: null, code: null };
+  }
+  const record = data as Record<string, unknown>;
+
+  if (record.type === 'error' && record.error && typeof record.error === 'object') {
+    const err = record.error as Record<string, unknown>;
+    return {
+      message: (err.message as string) ?? null,
+      code: (err.type as string) ?? null,
+    };
+  }
+
+  const err = record.error;
   if (err && typeof err === 'object') {
-    return (err as Record<string, unknown>).message as string ?? null;
+    const obj = err as Record<string, unknown>;
+    return {
+      message: (obj.message as string) ?? null,
+      code: (obj.code as string) ?? (obj.type as string) ?? null,
+    };
   }
   if (typeof err === 'string') {
-    return err;
+    return { message: err, code: null };
   }
-  return null;
+  return { message: null, code: null };
 }
 
 interface RequestOptions {
   method: string;
   path: string;
   body?: Record<string, unknown>;
-  files?: Record<string, Buffer | string>;
+  formFields?: Record<string, string | number | undefined | null>;
+  files?: Record<string, Buffer | Blob | string>;
   timeout?: number;
-  stream?: boolean;
+  extraHeaders?: Record<string, string>;
+  params?: Record<string, string | undefined>;
 }
 
 interface RequestResult {
@@ -54,9 +74,9 @@ export class AsyncHTTPClient {
     streamTimeout?: number;
     maxRetries?: number;
   }) {
-    if (baseUrl.startsWith('http://')) {
+    if (baseUrl.startsWith('http://') && !baseUrl.includes('localhost')) {
       throw new Error(
-        'HTTPS is required. Use \'https://\' URL scheme. See: https://docs.rodiumai.io/security'
+        'HTTPS is required for production. Use http://localhost:8001/v1 for local development only.'
       );
     }
     this.apiKey = apiKey;
@@ -66,13 +86,17 @@ export class AsyncHTTPClient {
     this.maxRetries = maxRetries;
   }
 
-  private getHeaders(): Record<string, string> {
+  getApiKey(): string {
+    return this.apiKey;
+  }
+
+  getHeaders(extra?: Record<string, string>): Record<string, string> {
     return {
       Authorization: `Bearer ${this.apiKey}`,
       'X-RodiumAI-SDK': `javascript/${VERSION}`,
       'X-RodiumAI-Version': VERSION,
-      'Content-Type': 'application/json',
       'User-Agent': `RodiumAI-JS-SDK/${VERSION}`,
+      ...extra,
     };
   }
 
@@ -80,6 +104,16 @@ export class AsyncHTTPClient {
     return typeof globalThis.crypto?.randomUUID === 'function'
       ? globalThis.crypto.randomUUID()
       : nodeRandomUUID();
+  }
+
+  private buildUrl(path: string, params?: Record<string, string | undefined>): string {
+    const url = new URL(`${this.baseUrl}${path}`);
+    if (params) {
+      for (const [key, value] of Object.entries(params)) {
+        if (value !== undefined) url.searchParams.set(key, value);
+      }
+    }
+    return url.toString();
   }
 
   private async doFetch(
@@ -97,44 +131,80 @@ export class AsyncHTTPClient {
     }
   }
 
+  private mapResponseError(
+    status: number,
+    data: unknown,
+    requestId: string,
+    headers: { get(name: string): string | null }
+  ): RodiumAIError {
+    const error = mapHttpStatus(status, requestId);
+    const { message, code } = extractBackendError(data);
+    if (message) error.message = message;
+    if (code) error.errorCode = code;
+
+    if (status === 429 && error instanceof RateLimitError) {
+      const retryAfterStr = headers.get('Retry-After') ?? '1';
+      const retryAfter = Number.parseFloat(retryAfterStr);
+      error.retryAfter = Number.isFinite(retryAfter) ? retryAfter : 1;
+    }
+    return error;
+  }
+
   async request(opts: RequestOptions): Promise<RequestResult> {
-    const url = `${this.baseUrl}${opts.path}`;
-    const headers = this.getHeaders();
+    const url = this.buildUrl(opts.path, opts.params);
+    const headers = this.getHeaders(opts.extraHeaders);
     const rid = this.requestId();
     let retryCount = 0;
-
-    const fetchOpts: Record<string, unknown> = {
-      method: opts.method,
-      headers,
-    };
-
-    if (opts.body) {
-      fetchOpts.body = JSON.stringify(opts.body);
-    }
-
     const effectiveTimeout = opts.timeout ?? this.timeout;
 
     while (retryCount <= this.maxRetries) {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), effectiveTimeout);
 
+      const fetchOpts: Record<string, unknown> = {
+        method: opts.method,
+        headers: { ...headers },
+      };
+
+      if (opts.files) {
+        const form = new FormData();
+        for (const [key, value] of Object.entries(opts.files)) {
+          if (Buffer.isBuffer(value)) {
+            form.append(key, new Blob([value]), 'upload.bin');
+          } else {
+            form.append(key, value as Blob | string);
+          }
+        }
+        if (opts.formFields) {
+          for (const [key, value] of Object.entries(opts.formFields)) {
+            if (value !== undefined && value !== null) {
+              form.append(key, String(value));
+            }
+          }
+        }
+        delete (fetchOpts.headers as Record<string, string>)['Content-Type'];
+        fetchOpts.body = form;
+      } else if (opts.body) {
+        (fetchOpts.headers as Record<string, string>)['Content-Type'] = 'application/json';
+        fetchOpts.body = JSON.stringify(opts.body);
+      }
+
       try {
         const response = await this.doFetch(url, fetchOpts, controller.signal);
         clearTimeout(timer);
         const respRid = response.headers.get('X-Request-ID') ?? rid;
+        const contentType = response.headers.get('content-type') ?? '';
         const text = await response.text();
-        const data: Record<string, unknown> = text ? JSON.parse(text) : {};
+        let data: Record<string, unknown> = {};
+        if (text && contentType.includes('application/json')) {
+          data = JSON.parse(text) as Record<string, unknown>;
+        }
 
         if (response.status < 400) {
           return { status: response.status, data, requestId: respRid };
         }
 
-        const error = mapHttpStatus(response.status, respRid);
-
-        const backendMsg = extractBackendError(data);
-        if (backendMsg) {
-          error.message = backendMsg;
-        }
+        const error = this.mapResponseError(response.status, data, respRid, response.headers);
 
         if ([429, 500, 502, 503, 504].includes(response.status)) {
           if (retryCount < this.maxRetries) {
@@ -167,13 +237,57 @@ export class AsyncHTTPClient {
     throw new RodiumAIError({ message: 'Request failed after retries', code: 0 });
   }
 
+  async requestBinary(opts: Omit<RequestOptions, 'files' | 'formFields'>): Promise<{
+    content: ArrayBuffer;
+    contentType: string;
+  }> {
+    const url = this.buildUrl(opts.path, opts.params);
+    const headers = this.getHeaders({ 'Content-Type': 'application/json', ...opts.extraHeaders });
+    const effectiveTimeout = opts.timeout ?? this.timeout;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), effectiveTimeout);
+
+    try {
+      const response = await this.doFetch(
+        url,
+        {
+          method: opts.method,
+          headers,
+          body: opts.body ? JSON.stringify(opts.body) : undefined,
+        },
+        controller.signal
+      );
+      clearTimeout(timer);
+
+      if (response.status < 400) {
+        return {
+          content: await response.arrayBuffer(),
+          contentType: response.headers.get('content-type') ?? 'application/octet-stream',
+        };
+      }
+
+      const text = await response.text();
+      const data =
+        text && response.headers.get('content-type')?.includes('json') ? JSON.parse(text) : {};
+      const rid = response.headers.get('X-Request-ID') ?? this.requestId();
+      throw this.mapResponseError(response.status, data, rid, response.headers);
+    } catch (err) {
+      clearTimeout(timer);
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        throw new TimeoutError(effectiveTimeout / 1000);
+      }
+      if (err instanceof RodiumAIError) throw err;
+      throw new NetworkError((err as Error).message);
+    }
+  }
+
   async *stream(
     path: string,
     body: Record<string, unknown>,
     timeout?: number
   ): AsyncGenerator<Record<string, unknown>> {
     const url = `${this.baseUrl}${path}`;
-    const headers = this.getHeaders();
+    const headers = this.getHeaders({ 'Content-Type': 'application/json' });
     const effectiveTimeout = timeout ?? this.streamTimeout;
 
     const controller = new AbortController();
@@ -193,12 +307,7 @@ export class AsyncHTTPClient {
         const text = await response.text();
         const data = text ? JSON.parse(text) : {};
         const rid = response.headers.get('X-Request-ID') ?? this.requestId();
-        const error = mapHttpStatus(response.status, rid);
-        const backendMsg = extractBackendError(data);
-        if (backendMsg) {
-          error.message = backendMsg;
-        }
-        throw error;
+        throw this.mapResponseError(response.status, data, rid, response.headers);
       }
 
       if (!response.body) {
