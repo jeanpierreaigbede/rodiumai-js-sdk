@@ -1,6 +1,6 @@
 {
   "name": "rodiumai",
-  "version": "0.2.0",
+  "version": "0.3.1",
   "description": "RodiumAI SDK — Unified AI API for Africa",
   "keywords": ["ai", "api", "africa", "llm", "openai-compatible"],
   "homepage": "https://rodiumai.io",
@@ -26,8 +26,13 @@
     "test:unit": "jest tests/unit",
     "test:integration": "jest tests/integration",
     "lint": "eslint src/ --ext .ts",
+    "lint:fix": "eslint src/ --ext .ts --fix",
     "format": "prettier --check src/ tests/",
-    "typecheck": "tsc --noEmit"
+    "format:fix": "prettier --write src/ tests/",
+    "typecheck": "tsc --noEmit",
+    "audit": "npm audit --audit-level=moderate",
+    "ci": "npm run lint && npm run typecheck && npm run format && npm run audit && npm run test:unit",
+    "ci:full": "npm run ci && npm run test:integration && npm run build"
   },
   "dependencies": {
     "node-fetch": "^2.7.0"
@@ -45,6 +50,11 @@
     "nock": "^13.5.0",
     "@types/nock": "^11.1.0",
     "typescript": "^5.0.0"
+  },
+  "overrides": {
+    "brace-expansion": "^2.1.4",
+    "form-data": "^4.0.6",
+    "js-yaml": "^4.3.2"
   },
   "jest": {
     "preset": "ts-jest/presets/default-esm",

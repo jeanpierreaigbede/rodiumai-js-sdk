@@ -2,18 +2,21 @@ import { RodiumAI, RodiumAIError, InvalidAPIKeyError } from '../../src/index';
 
 describe('Security — HTTPS Enforcement', () => {
   it('rejects http:// URL', () => {
-    expect(() => new RodiumAI({ apiKey: 'rdk-test', baseURL: 'http://api.rodiumai.io/v1' }))
-      .toThrow('HTTPS is required');
+    expect(
+      () => new RodiumAI({ apiKey: 'rdk-test', baseURL: 'http://api.rodiumai.io/v1' })
+    ).toThrow('HTTPS is required');
   });
 
   it('accepts https:// URL', () => {
-    expect(() => new RodiumAI({ apiKey: 'rdk-test', baseURL: 'https://api.rodiumai.io/v1' }))
-      .not.toThrow();
+    expect(
+      () => new RodiumAI({ apiKey: 'rdk-test', baseURL: 'https://api.rodiumai.io/v1' })
+    ).not.toThrow();
   });
 
-  it('rejects http:// with port', () => {
-    expect(() => new RodiumAI({ apiKey: 'rdk-test', baseURL: 'http://localhost:8080/v1' }))
-      .toThrow('HTTPS is required');
+  it('allows http://localhost for local development', () => {
+    expect(
+      () => new RodiumAI({ apiKey: 'rdk-test', baseURL: 'http://localhost:8080/v1' })
+    ).not.toThrow();
   });
 });
 
@@ -55,11 +58,11 @@ describe('Security — API Key Validation', () => {
 
 describe('Security — Header Injection', () => {
   it('rejects newline in API key', () => {
-    expect(() => new RodiumAI({ apiKey: "rdk-key\r\nX-Injected: evil" })).toThrow();
+    expect(() => new RodiumAI({ apiKey: 'rdk-key\r\nX-Injected: evil' })).toThrow();
   });
 
   it('rejects null byte in API key', () => {
-    expect(() => new RodiumAI({ apiKey: "rdk-key\x00malicious" })).toThrow();
+    expect(() => new RodiumAI({ apiKey: 'rdk-key\x00malicious' })).toThrow();
   });
 });
 

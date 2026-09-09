@@ -19,7 +19,9 @@ describe('Embeddings resource', () => {
         usage: { prompt_tokens: 3, total_tokens: 3 },
       });
 
-    const embeddings = new Embeddings(new AsyncHTTPClient({ apiKey: 'rdk-test', baseUrl: `${API_BASE}/v1`, maxRetries: 0 }));
+    const embeddings = new Embeddings(
+      new AsyncHTTPClient({ apiKey: 'rdk-test', baseUrl: `${API_BASE}/v1`, maxRetries: 0 })
+    );
     const res = await embeddings.create({ input: 'hello' });
     expect(res.data[0].index).toBe(0);
     expect(res.data[0].embedding).toEqual([0.1, 0.2]);
@@ -38,7 +40,9 @@ describe('Embeddings resource', () => {
         model: 'auto',
       });
 
-    const embeddings = new Embeddings(new AsyncHTTPClient({ apiKey: 'rdk-test', baseUrl: `${API_BASE}/v1`, maxRetries: 0 }));
+    const embeddings = new Embeddings(
+      new AsyncHTTPClient({ apiKey: 'rdk-test', baseUrl: `${API_BASE}/v1`, maxRetries: 0 })
+    );
     const res = await embeddings.create({ input: ['a', 'b'] });
     expect(res.data).toHaveLength(2);
     expect(res.data[1].index).toBe(1);

@@ -56,7 +56,9 @@ describe('Chat Integration', () => {
         object: 'chat.completion',
         created: 1,
         model: 'auto',
-        choices: [{ index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+        choices: [
+          { index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' },
+        ],
       });
 
     await client.chat.completions.create({
@@ -68,11 +70,12 @@ describe('Chat Integration', () => {
   });
 
   it('streaming SSE parsed chunk by chunk', async () => {
-    const sseData = [
-      'data: {"id":"chunk-1","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"Hello"},"finish_reason":null}]}',
-      'data: {"id":"chunk-1","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":" world"},"finish_reason":null}]}',
-      'data: [DONE]',
-    ].join('\n\n') + '\n\n';
+    const sseData =
+      [
+        'data: {"id":"chunk-1","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"Hello"},"finish_reason":null}]}',
+        'data: {"id":"chunk-1","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":" world"},"finish_reason":null}]}',
+        'data: [DONE]',
+      ].join('\n\n') + '\n\n';
 
     nock(API_BASE)
       .post('/v1/chat/completions')
@@ -95,9 +98,7 @@ describe('Chat Integration', () => {
   });
 
   it('invalid model returns error', async () => {
-    nock(API_BASE)
-      .post('/v1/chat/completions')
-      .reply(404, {}, { 'X-Request-ID': 'req-404' });
+    nock(API_BASE).post('/v1/chat/completions').reply(404, {}, { 'X-Request-ID': 'req-404' });
 
     await expect(
       client.chat.completions.create({

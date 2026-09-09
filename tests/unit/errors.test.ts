@@ -20,10 +20,10 @@ describe('Error Hierarchy', () => {
     expect(err.fixSuggestion).toContain('rodiumai.io');
   });
 
-  it('InsufficientRODIError has code 402 and errorCode insufficient_rodi', () => {
+  it('InsufficientRODIError has code 402 and errorCode insufficient_balance', () => {
     const err = new InsufficientRODIError('req-2');
     expect(err.code).toBe(402);
-    expect(err.errorCode).toBe('insufficient_rodi');
+    expect(err.errorCode).toBe('insufficient_balance');
   });
 
   it('PermissionDeniedError has code 403 and errorCode permission_denied', () => {
@@ -89,7 +89,7 @@ describe('Error Hierarchy', () => {
     expect(mapHttpStatus(401)).toBeInstanceOf(InvalidAPIKeyError);
     expect(mapHttpStatus(401).errorCode).toBe('invalid_api_key');
     expect(mapHttpStatus(402)).toBeInstanceOf(InsufficientRODIError);
-    expect(mapHttpStatus(402).errorCode).toBe('insufficient_rodi');
+    expect(mapHttpStatus(402).errorCode).toBe('insufficient_balance');
     expect(mapHttpStatus(403)).toBeInstanceOf(PermissionDeniedError);
     expect(mapHttpStatus(403).errorCode).toBe('permission_denied');
     expect(mapHttpStatus(404)).toBeInstanceOf(ModelNotFoundError);
