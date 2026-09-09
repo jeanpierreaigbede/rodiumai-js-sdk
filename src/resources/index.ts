@@ -5,4 +5,5 @@ export { Audio } from './audio.js';
 export { Generations, createVideoResource } from './video.js';
 export { Models, createModelsResource } from './models.js';
 export { Messages, createMessagesResource } from './messages.js';
+export { Responses, createResponsesResource } from './responses.js';
 export { Extensions } from './extensions.js';

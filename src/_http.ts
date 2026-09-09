@@ -284,10 +284,11 @@ export class AsyncHTTPClient {
   async *stream(
     path: string,
     body: Record<string, unknown>,
-    timeout?: number
+    timeout?: number,
+    extraHeaders?: Record<string, string>
   ): AsyncGenerator<Record<string, unknown>> {
     const url = `${this.baseUrl}${path}`;
-    const headers = this.getHeaders({ 'Content-Type': 'application/json' });
+    const headers = this.getHeaders({ 'Content-Type': 'application/json', ...extraHeaders });
     const effectiveTimeout = timeout ?? this.streamTimeout;
 
     const controller = new AbortController();

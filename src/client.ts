@@ -9,6 +9,7 @@ import { Extensions } from './resources/extensions.js';
 import { createImagesResource, ImagesResource } from './resources/images.js';
 import { createMessagesResource, MessagesResource } from './resources/messages.js';
 import { createModelsResource, ModelsResource } from './resources/models.js';
+import { createResponsesResource, ResponsesResource } from './resources/responses.js';
 import { createVideoResource, VideoResource } from './resources/video.js';
 import { UsageStats } from './usage.js';
 
@@ -41,6 +42,7 @@ export class RodiumAI {
   public video: VideoResource;
   public models: ModelsResource;
   public messages: MessagesResource;
+  public responses: ResponsesResource;
 
   private apiKey: string;
   private baseURL: string;
@@ -109,6 +111,7 @@ export class RodiumAI {
     this.video = createVideoResource(this._http, () => this.resolveModel(), this.timeout);
     this.models = createModelsResource(this._http);
     this.messages = createMessagesResource(this._http);
+    this.responses = createResponsesResource(this._http);
 
     const completions = new Completions(this._http);
     const flatChat = async (
