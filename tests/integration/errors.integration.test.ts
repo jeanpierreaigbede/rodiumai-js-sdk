@@ -1,5 +1,11 @@
 import nock from 'nock';
-import { RodiumAI, InvalidAPIKeyError, InsufficientRODIError, RateLimitError, InternalServerError } from '../../src/index';
+import {
+  RodiumAI,
+  InvalidAPIKeyError,
+  InsufficientRODIError,
+  RateLimitError,
+  InternalServerError,
+} from '../../src/index';
 
 const API_BASE = 'https://api.rodiumai.io';
 
@@ -29,7 +35,10 @@ describe('Error Scenarios Integration', () => {
   });
 
   it('429 with Retry-After -> RateLimitError', async () => {
-    nock(API_BASE).post('/v1/chat/completions').times(4).reply(429, {}, { 'X-Request-ID': 'req-429', 'Retry-After': '2' });
+    nock(API_BASE)
+      .post('/v1/chat/completions')
+      .times(4)
+      .reply(429, {}, { 'X-Request-ID': 'req-429', 'Retry-After': '2' });
 
     await expect(
       client.chat.completions.create({ model: 'auto', messages: [{ role: 'user', content: 'Hi' }] })

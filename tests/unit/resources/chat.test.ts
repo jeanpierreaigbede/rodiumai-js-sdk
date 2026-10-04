@@ -10,12 +10,18 @@ describe('Chat resource', () => {
   });
 
   it('rejects empty messages', async () => {
-    const chat = new Chat(new AsyncHTTPClient({ apiKey: 'rdk-test', baseUrl: `${API_BASE}/v1`, maxRetries: 0 }));
-    await expect(chat.completions.create({ messages: [] as any })).rejects.toThrow('messages must not be empty');
+    const chat = new Chat(
+      new AsyncHTTPClient({ apiKey: 'rdk-test', baseUrl: `${API_BASE}/v1`, maxRetries: 0 })
+    );
+    await expect(chat.completions.create({ messages: [] as any })).rejects.toThrow(
+      'messages must not be empty'
+    );
   });
 
   it('rejects temperature out of range', async () => {
-    const chat = new Chat(new AsyncHTTPClient({ apiKey: 'rdk-test', baseUrl: `${API_BASE}/v1`, maxRetries: 0 }));
+    const chat = new Chat(
+      new AsyncHTTPClient({ apiKey: 'rdk-test', baseUrl: `${API_BASE}/v1`, maxRetries: 0 })
+    );
     await expect(
       chat.completions.create({
         messages: [{ role: 'user', content: 'hi' }],
@@ -25,7 +31,9 @@ describe('Chat resource', () => {
   });
 
   it('rejects max_tokens <= 0', async () => {
-    const chat = new Chat(new AsyncHTTPClient({ apiKey: 'rdk-test', baseUrl: `${API_BASE}/v1`, maxRetries: 0 }));
+    const chat = new Chat(
+      new AsyncHTTPClient({ apiKey: 'rdk-test', baseUrl: `${API_BASE}/v1`, maxRetries: 0 })
+    );
     await expect(
       chat.completions.create({
         messages: [{ role: 'user', content: 'hi' }],
@@ -42,30 +50,42 @@ describe('Chat resource', () => {
         object: 'chat.completion',
         created: 1,
         model: 'auto',
-        choices: [{ index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+        choices: [
+          { index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' },
+        ],
         usage: { prompt_tokens: 1, completion_tokens: 2, total_tokens: 3 },
       });
 
-    const chat = new Chat(new AsyncHTTPClient({ apiKey: 'rdk-test', baseUrl: `${API_BASE}/v1`, maxRetries: 0 }));
-    const res = (await chat.completions.create({ messages: [{ role: 'user', content: 'hi' }] })) as any;
+    const chat = new Chat(
+      new AsyncHTTPClient({ apiKey: 'rdk-test', baseUrl: `${API_BASE}/v1`, maxRetries: 0 })
+    );
+    const res = (await chat.completions.create({
+      messages: [{ role: 'user', content: 'hi' }],
+    })) as any;
     expect(res.id).toBe('chatcmpl-1');
     expect(res.choices[0].message.content).toBe('ok');
     expect(res.usage.total_tokens).toBe(3);
   });
 
   it('parses stream chunks and skips empty choices', async () => {
-    const sse = [
-      'data: {"id":"c1","object":"chat.completion.chunk","choices":[]}',
-      'data: {"id":"c1","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"Hello"}}]}',
-      'data: [DONE]',
-    ].join('\n\n') + '\n\n';
+    const sse =
+      [
+        'data: {"id":"c1","object":"chat.completion.chunk","choices":[]}',
+        'data: {"id":"c1","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"Hello"}}]}',
+        'data: [DONE]',
+      ].join('\n\n') + '\n\n';
 
     nock(API_BASE)
       .post('/v1/chat/completions')
       .reply(200, sse, { 'Content-Type': 'text/event-stream' });
 
-    const chat = new Chat(new AsyncHTTPClient({ apiKey: 'rdk-test', baseUrl: `${API_BASE}/v1`, maxRetries: 0 }));
-    const stream = (await chat.completions.create({ messages: [{ role: 'user', content: 'hi' }], stream: true })) as AsyncGenerator<any>;
+    const chat = new Chat(
+      new AsyncHTTPClient({ apiKey: 'rdk-test', baseUrl: `${API_BASE}/v1`, maxRetries: 0 })
+    );
+    const stream = (await chat.completions.create({
+      messages: [{ role: 'user', content: 'hi' }],
+      stream: true,
+    })) as AsyncGenerator<any>;
 
     const chunks: any[] = [];
     for await (const chunk of stream) chunks.push(chunk);

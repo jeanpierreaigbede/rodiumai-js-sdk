@@ -10,7 +10,14 @@ describe('UsageStats', () => {
 
   it('records successful request', () => {
     const stats = new UsageStats();
-    stats.recordRequest({ success: true, model: 'auto', endpoint: '/test', latencyMs: 100, promptTokens: 10, completionTokens: 20 });
+    stats.recordRequest({
+      success: true,
+      model: 'auto',
+      endpoint: '/test',
+      latencyMs: 100,
+      promptTokens: 10,
+      completionTokens: 20,
+    });
     expect(stats.totalRequests).toBe(1);
     expect(stats.successfulRequests).toBe(1);
     expect(stats.totalTokens).toBe(30);
@@ -39,8 +46,22 @@ describe('UsageStats', () => {
 
   it('accumulates tokens', () => {
     const stats = new UsageStats();
-    stats.recordRequest({ success: true, model: 'auto', endpoint: '/test', latencyMs: 10, promptTokens: 50, completionTokens: 50 });
-    stats.recordRequest({ success: true, model: 'auto', endpoint: '/test', latencyMs: 10, promptTokens: 100, completionTokens: 100 });
+    stats.recordRequest({
+      success: true,
+      model: 'auto',
+      endpoint: '/test',
+      latencyMs: 10,
+      promptTokens: 50,
+      completionTokens: 50,
+    });
+    stats.recordRequest({
+      success: true,
+      model: 'auto',
+      endpoint: '/test',
+      latencyMs: 10,
+      promptTokens: 100,
+      completionTokens: 100,
+    });
     expect(stats.totalTokens).toBe(300);
   });
 

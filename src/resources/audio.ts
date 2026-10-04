@@ -10,31 +10,34 @@ export interface SpeechResponse {
 }
 
 export class Transcriptions {
-  private http: AsyncHTTPClient;
+  static DEFAULT_MODEL = 'openai/gpt-4o';
 
-  constructor(http: AsyncHTTPClient) {
-    this.http = http;
-  }
+  constructor(private http: AsyncHTTPClient) {}
 
   async create({
-    model = 'auto',
+    model = Transcriptions.DEFAULT_MODEL,
     file,
     language,
     timeout,
+    ...rest
   }: {
     model?: string;
     file: Buffer | Blob;
     language?: string;
     timeout?: number;
+    [key: string]: unknown;
   }): Promise<Transcription> {
-    const body: Record<string, unknown> = { model };
-    if (language !== undefined) body.language = language;
+    const formFields: Record<string, string | undefined> = {
+      model,
+      language,
+      ...(rest as Record<string, string>),
+    };
 
     const { data } = await this.http.request({
       method: 'POST',
       path: '/audio/transcriptions',
-      body,
-      files: { file: file as any },
+      formFields,
+      files: { file: file as Buffer },
       timeout,
     });
 
@@ -43,19 +46,18 @@ export class Transcriptions {
 }
 
 export class Speech {
-  private http: AsyncHTTPClient;
+  static DEFAULT_MODEL = 'openai/gpt-4o';
 
-  constructor(http: AsyncHTTPClient) {
-    this.http = http;
-  }
+  constructor(private http: AsyncHTTPClient) {}
 
   async create({
-    model = 'auto',
+    model = Speech.DEFAULT_MODEL,
     input,
     voice = 'alloy',
     response_format,
     speed,
     timeout,
+    ...rest
   }: {
     model?: string;
     input: string;
@@ -63,26 +65,20 @@ export class Speech {
     response_format?: string;
     speed?: number;
     timeout?: number;
+    [key: string]: unknown;
   }): Promise<SpeechResponse> {
-    const body: Record<string, unknown> = { model, input, voice };
+    const body: Record<string, unknown> = { model, input, voice, ...rest };
     if (response_format !== undefined) body.response_format = response_format;
     if (speed !== undefined) body.speed = speed;
 
-    const { data } = await this.http.request({
+    const { content, contentType } = await this.http.requestBinary({
       method: 'POST',
       path: '/audio/speech',
       body,
       timeout,
     });
 
-    const content = data.content
-      ? new TextEncoder().encode(data.content as string).buffer
-      : new ArrayBuffer(0);
-
-    return {
-      content,
-      contentType: (data.content_type as string) ?? 'audio/mpeg',
-    };
+    return { content, contentType };
   }
 }
 

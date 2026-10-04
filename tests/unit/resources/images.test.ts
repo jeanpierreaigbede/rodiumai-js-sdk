@@ -17,7 +17,9 @@ describe('Images resource', () => {
         data: [{ url: 'https://example.com/img.png' }],
       });
 
-    const images = new Images(new AsyncHTTPClient({ apiKey: 'rdk-test', baseUrl: `${API_BASE}/v1`, maxRetries: 0 }));
+    const images = new Images(
+      new AsyncHTTPClient({ apiKey: 'rdk-test', baseUrl: `${API_BASE}/v1`, maxRetries: 0 })
+    );
     const res = await images.generate({ prompt: 'cat' });
     expect(res.created).toBe(123);
     expect(res.data[0].url).toBe('https://example.com/img.png');
@@ -31,7 +33,9 @@ describe('Images resource', () => {
         data: [{ b64_json: 'AAAA' }],
       });
 
-    const images = new Images(new AsyncHTTPClient({ apiKey: 'rdk-test', baseUrl: `${API_BASE}/v1`, maxRetries: 0 }));
+    const images = new Images(
+      new AsyncHTTPClient({ apiKey: 'rdk-test', baseUrl: `${API_BASE}/v1`, maxRetries: 0 })
+    );
     const res = await images.generate({ prompt: 'cat' });
     expect(res.data[0].b64_json).toBe('AAAA');
   });

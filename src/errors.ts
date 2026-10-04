@@ -60,7 +60,7 @@ export class InsufficientRODIError extends RodiumAIError {
     super({
       message: 'You do not have enough RODI credits to complete this request.',
       code: 402,
-      errorCode: 'insufficient_rodi',
+      errorCode: 'insufficient_balance',
       requestId: requestId ?? null,
       fixSuggestion: 'Top up your wallet at https://rodiumai.io/wallet',
       docsUrl: 'https://docs.rodiumai.io/billing',
@@ -75,7 +75,8 @@ export class PermissionDeniedError extends RodiumAIError {
       code: 403,
       errorCode: 'permission_denied',
       requestId: requestId ?? null,
-      fixSuggestion: 'Verify your API key has the required permissions at https://rodiumai.io/dashboard',
+      fixSuggestion:
+        'Verify your API key has the required permissions at https://rodiumai.io/dashboard',
       docsUrl: 'https://docs.rodiumai.io/permissions',
     });
   }
@@ -103,7 +104,8 @@ export class RateLimitError extends RodiumAIError {
       code: 429,
       errorCode: 'rate_limit_exceeded',
       requestId: requestId ?? null,
-      fixSuggestion: 'Retry after the suggested delay. Consider upgrading your plan at https://rodiumai.io/pricing',
+      fixSuggestion:
+        'Retry after the suggested delay. Consider upgrading your plan at https://rodiumai.io/pricing',
       docsUrl: 'https://docs.rodiumai.io/rate-limits',
     });
     this.retryAfter = retryAfter ?? null;
@@ -117,7 +119,8 @@ export class InternalServerError extends RodiumAIError {
       code: 500,
       errorCode: 'internal_error',
       requestId: requestId ?? null,
-      fixSuggestion: 'Retry your request. If the problem persists, contact support at https://rodiumai.io/support',
+      fixSuggestion:
+        'Retry your request. If the problem persists, contact support at https://rodiumai.io/support',
       docsUrl: 'https://docs.rodiumai.io/troubleshooting',
     });
   }
@@ -174,9 +177,20 @@ const HTTP_STATUS_TO_ERROR: Record<number, new (...args: any[]) => RodiumAIError
   503: ServiceUnavailableError,
 };
 
-const GENERIC_ERRORS: Record<number, { errorCode: string; message: string; fixSuggestion: string }> = {
-  400: { errorCode: 'invalid_request', message: 'Invalid request. Check the parameters and try again.', fixSuggestion: 'Verify your request body parameters match the API documentation.' },
-  422: { errorCode: 'validation_error', message: 'Request validation failed.', fixSuggestion: 'Check that all required fields are present and correctly formatted.' },
+const GENERIC_ERRORS: Record<
+  number,
+  { errorCode: string; message: string; fixSuggestion: string }
+> = {
+  400: {
+    errorCode: 'invalid_request',
+    message: 'Invalid request. Check the parameters and try again.',
+    fixSuggestion: 'Verify your request body parameters match the API documentation.',
+  },
+  422: {
+    errorCode: 'validation_error',
+    message: 'Request validation failed.',
+    fixSuggestion: 'Check that all required fields are present and correctly formatted.',
+  },
 };
 
 export function mapHttpStatus(status: number, requestId?: string): RodiumAIError {
@@ -205,5 +219,7 @@ export function mapHttpStatus(status: number, requestId?: string): RodiumAIError
   if (Cls === RateLimitError) {
     return new Cls(requestId);
   }
-  return new (Cls as any)(requestId);
+  return new (Cls as new (requestId?: string) => RodiumAIError)(requestId);
 }
+
+export { InsufficientRODIError as InsufficientBalanceError };

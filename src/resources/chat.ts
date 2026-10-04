@@ -43,68 +43,81 @@ export interface ChatCompletion {
   model: string;
   choices: Choice[];
   usage?: CompletionUsage | null;
-}
-
-interface ChatOptions {
-  model?: string;
-  messages: Array<{ role: string; content: string }>;
-  stream?: boolean;
-  temperature?: number;
-  max_tokens?: number;
-  top_p?: number;
-  stop?: string[];
-  timeout?: number;
+  cost_rodi?: number | null;
+  routing?: Record<string, unknown> | null;
+  raw?: Record<string, unknown>;
 }
 
 export class Completions {
-  private http: AsyncHTTPClient;
+  static DEFAULT_MODEL = 'openai/gpt-4o';
 
-  constructor(http: AsyncHTTPClient) {
-    this.http = http;
-  }
+  constructor(private http: AsyncHTTPClient) {}
 
-  async create(opts: ChatOptions): Promise<ChatCompletion | AsyncGenerator<ChatCompletionChunk>> {
+  async create(opts: {
+    model?: string;
+    messages: Array<{ role: string; content: string | unknown }>;
+    stream?: boolean;
+    temperature?: number;
+    max_tokens?: number;
+    top_p?: number;
+    stop?: string | string[];
+    timeout?: number;
+    [key: string]: unknown;
+  }): Promise<ChatCompletion | AsyncGenerator<ChatCompletionChunk>> {
     if (!opts.messages || opts.messages.length === 0) {
       throw new Error('messages must not be empty');
     }
 
+    const {
+      stream,
+      timeout,
+      model = Completions.DEFAULT_MODEL,
+      messages,
+      temperature,
+      max_tokens,
+      top_p,
+      stop,
+      ...rest
+    } = opts;
+
     const body: Record<string, unknown> = {
-      model: opts.model ?? 'auto',
-      messages: opts.messages,
-      stream: opts.stream ?? false,
+      model,
+      messages,
+      stream: stream ?? false,
+      ...rest,
     };
 
-    if (opts.temperature !== undefined) {
-      if (opts.temperature < 0 || opts.temperature > 2) {
+    if (temperature !== undefined) {
+      if (temperature < 0 || temperature > 2) {
         throw new Error('temperature must be between 0 and 2');
       }
-      body.temperature = opts.temperature;
+      body.temperature = temperature;
     }
-    if (opts.max_tokens !== undefined) {
-      if (opts.max_tokens <= 0) throw new Error('max_tokens must be greater than 0');
-      body.max_tokens = opts.max_tokens;
+    if (max_tokens !== undefined) {
+      if (max_tokens <= 0) throw new Error('max_tokens must be greater than 0');
+      body.max_tokens = max_tokens;
     }
-    if (opts.top_p !== undefined) body.top_p = opts.top_p;
-    if (opts.stop !== undefined) body.stop = opts.stop;
+    if (top_p !== undefined) body.top_p = top_p;
+    if (stop !== undefined) body.stop = stop;
 
-    if (opts.stream) {
-      return this.streamCreate(body, opts.timeout);
+    if (stream) {
+      return this.streamCreate(body, timeout);
     }
 
     const { data } = await this.http.request({
       method: 'POST',
       path: '/chat/completions',
       body,
-      timeout: opts.timeout,
+      timeout,
     });
 
-    const choices: Choice[] = (data.choices as any[] ?? []).map((c: any) => ({
-      index: c.index ?? 0,
+    const choices: Choice[] = ((data.choices as Record<string, unknown>[]) ?? []).map((c) => ({
+      index: (c.index as number) ?? 0,
       message: {
-        role: c.message?.role ?? '',
-        content: c.message?.content ?? null,
+        role: ((c.message as Record<string, unknown>)?.role as string) ?? '',
+        content: ((c.message as Record<string, unknown>)?.content as string) ?? null,
       },
-      finish_reason: c.finish_reason ?? null,
+      finish_reason: (c.finish_reason as string) ?? null,
     }));
 
     const usageData = data.usage as Record<string, number> | undefined;
@@ -116,13 +129,21 @@ export class Completions {
         }
       : undefined;
 
+    let costRodi = data.cost_rodi as number | undefined;
+    if (costRodi === undefined && data.rodiumai && typeof data.rodiumai === 'object') {
+      costRodi = (data.rodiumai as Record<string, unknown>).cost_rodi as number | undefined;
+    }
+
     return {
       id: (data.id as string) ?? '',
       object: (data.object as string) ?? 'chat.completion',
       created: (data.created as number) ?? 0,
-      model: (data.model as string) ?? (opts.model ?? 'auto'),
+      model: (data.model as string) ?? model,
       choices,
       usage,
+      cost_rodi: costRodi ?? null,
+      routing: (data.routing as Record<string, unknown>) ?? null,
+      raw: data,
     };
   }
 
@@ -132,15 +153,15 @@ export class Completions {
   ): AsyncGenerator<ChatCompletionChunk> {
     const gen = this.http.stream('/chat/completions', body, timeout);
     for await (const chunk of gen) {
-      const rawChoices = (chunk.choices as any[]) ?? [];
+      const rawChoices = (chunk.choices as Record<string, unknown>[]) ?? [];
       if (rawChoices.length === 0) continue;
-      const choices: ChunkChoice[] = rawChoices.map((c: any) => ({
-        index: c.index ?? 0,
+      const choices: ChunkChoice[] = rawChoices.map((c) => ({
+        index: (c.index as number) ?? 0,
         delta: {
-          role: c.delta?.role ?? null,
-          content: c.delta?.content ?? null,
+          role: ((c.delta as Record<string, unknown>)?.role as string) ?? null,
+          content: ((c.delta as Record<string, unknown>)?.content as string) ?? null,
         },
-        finish_reason: c.finish_reason ?? null,
+        finish_reason: (c.finish_reason as string) ?? null,
       }));
 
       yield {
@@ -152,6 +173,19 @@ export class Completions {
       };
     }
   }
+}
+
+export type ChatResource = {
+  (
+    messages: string | Array<{ role: string; content: string | unknown }>,
+    options?: Record<string, unknown>
+  ): Promise<ChatCompletion>;
+  completions: Completions;
+};
+
+export function createChatResource(http: AsyncHTTPClient, flatChat: ChatResource): ChatResource {
+  const completions = new Completions(http);
+  return Object.assign(flatChat, { completions }) as ChatResource;
 }
 
 export class Chat {

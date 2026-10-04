@@ -1,36 +1,26 @@
 # Changelog
 
-## 0.2.0 (2026-06-04)
+## 0.3.1
 
-### Security & CI Improvements
+### Features & Improvements
 
-- Security tests: header injection, API key validation, HTTPS enforcement, DoS caps
-- Max retries capped at 5 globally to prevent abuse
-- Header injection protection (`\r`, `\n`, `\x00`) in API key
-- `toJSON()` added to `RodiumAIError` for proper error serialization
-- Split CI/CD: `ci.yml` (test+lint+security) and `publish.yml` (npm publish)
-- ESLint + TypeScript strict mode configured
-- `tests/` tracked in git for CI compatibility
-- `package-lock.json` committed
-- Stable test suite: 88 unit tests, 0 failures
-- Coverage reporting fixed with `--coverage` flag
-- Branch protection rules for `main` and `before-develop`
-- `CODECOV_TOKEN` required for coverage upload
+- **Responses API**: Added OpenAI-compatible `/v1/responses` resource with streaming and text aggregation
+- **Observability**: Automatic in-memory usage tracking (`client.usage`) recording latency, tokens, error rates, and request counts
+- **Test coverage**: Unit tests added for Video generations and Realtime Responses resources (100% passing)
+- **Documentation**: Full API reference in README per endpoint, corrected brand naming to RodiumAI
 
-## 0.1.0 (2026-06-01)
+## 0.3.0 (2026-08-31)
 
-### Initial Release
+### Gateway alignment
 
-- Chat Completions (standard + streaming SSE)
-- Embeddings (single + batch)
-- Image Generation (text-to-image)
-- Audio (speech-to-text + text-to-speech)
-- Video stub (future-ready, throws Error)
-- Full error hierarchy (8 custom errors)
-- Structured JSON logging with alerts
-- Usage statistics per session
-- Automatic retry with exponential backoff
-- OpenAI drop-in replacement syntax
-- HTTPS enforced
-- TypeScript-first with full type definitions
-- Multi-architecture Docker support (node:22-alpine)
+- HTTP layer: binary responses, multipart uploads, Anthropic error parsing, Retry-After
+- Flat API + fluent builder (parity with Laravel SDK v0.2)
+- OpenAI nested API preserved (`client.chat.completions.create`, etc.)
+- New resources: models, messages, wallet/pricing extensions
+- Video generations implemented (was stub)
+- Default model `openai/gpt-4o`; 402 code `insufficient_balance`
+- Callable resources: `client.chat(...)`, `client.models(...)`, `client.embeddings(...)`
+
+## 0.2.0
+
+Initial npm release with chat, embeddings, images, audio nested API.
