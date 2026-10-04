@@ -65,7 +65,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: npm audit — dependency vulnerabilities
+      - name: npm audit — production dependencies
         run: npm run audit
 
       - name: Run security tests
