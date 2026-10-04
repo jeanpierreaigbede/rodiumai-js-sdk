@@ -1,19 +1,19 @@
 # RodiumAI JavaScript SDK
 
-Official TypeScript/JavaScript SDK for the [Rodium AI](https://www.rodiumai.io) API — unified access to AI models (OpenAI, Anthropic, Google, DeepSeek…) with **RODI** credit billing and **Mobile Money** top-ups.
+Official TypeScript/JavaScript SDK for the [RodiumAI](https://www.rodiumai.io) API — unified access to AI models (OpenAI, Anthropic, Google, DeepSeek…) with **RODI** credit billing and **Mobile Money** top-ups.
 
 > **OpenAI-compatible** REST API: same endpoints and payloads as documented at [rodiumai.io/docs](https://www.rodiumai.io/docs).
 
 [![npm version](https://img.shields.io/npm/v/rodiumai)](https://www.npmjs.com/package/rodiumai)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Tests](https://github.com/Docteur-Parfait/rodiumai-js-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/Docteur-Parfait/rodiumai-js-sdk/actions)
+[![Tests](https://github.com/jeanpierreaigbede/rodiumai-js-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/jeanpierreaigbede/rodiumai-js-sdk/actions)
 
 ## Links
 
 | Resource | URL |
 |----------|-----|
 | **npm** | [npmjs.com/package/rodiumai](https://www.npmjs.com/package/rodiumai) |
-| **Source code** | [github.com/Docteur-Parfait/rodiumai-js-sdk](https://github.com/Docteur-Parfait/rodiumai-js-sdk) |
+| **Source code** | [github.com/jeanpierreaigbede/rodiumai-js-sdk](https://github.com/jeanpierreaigbede/rodiumai-js-sdk) |
 | **JavaScript SDK guide** | [rodiumai.io/docs/guides/javascript-sdk](https://www.rodiumai.io/docs/guides/javascript-sdk) |
 | **API documentation** | [rodiumai.io/docs](https://www.rodiumai.io/docs) |
 | **Dashboard & API keys** | [rodiumai.io/dashboard](https://www.rodiumai.io/dashboard) |
@@ -33,7 +33,9 @@ Official TypeScript/JavaScript SDK for the [Rodium AI](https://www.rodiumai.io) 
 - [Videos (`POST /v1/videos/generations`)](#videos-post-v1videosgenerations)
 - [Audio](#audio)
 - [Anthropic Messages](#anthropic-messages)
+- [Realtime Responses (`POST /v1/responses`)](#realtime-responses-post-v1responses)
 - [Wallet & pricing](#wallet--pricing)
+- [Observability & Metrics](#observability--metrics)
 - [Error handling](#error-handling)
 - [SDK reference](#sdk-reference)
 - [OpenAI migration](#openai-migration)
@@ -45,7 +47,7 @@ Official TypeScript/JavaScript SDK for the [Rodium AI](https://www.rodiumai.io) 
 ## Requirements
 
 - Node.js **18+** (or any runtime with `fetch` and `FormData`)
-- Rodium AI account + API key (`rd_sk_…`): [dashboard](https://www.rodiumai.io/dashboard)
+- RodiumAI account + API key (`rd_sk_…`): [dashboard](https://www.rodiumai.io/dashboard)
 
 ## Installation
 
@@ -141,7 +143,7 @@ const fluent = await client.model('openai/gpt-4o').temperature(0.7).chat('Hello!
 ### Basic usage
 
 ```typescript
-const response = await client.chat('What is Rodium AI?');
+const response = await client.chat('What is RodiumAI?');
 
 const response2 = await client.chat(
   [
@@ -471,12 +473,78 @@ Streaming: pass `stream: true` — Anthropic SSE events (`content_block_delta`, 
 
 ---
 
+## Realtime Responses (`POST /v1/responses`)
+
+`POST /v1/responses` — OpenAI-compatible responses API for real-time model interactions.
+
+```typescript
+const response = await client.responses.create({
+  model: 'openai/gpt-4o',
+  input: 'Write a haiku about the Sahara.',
+});
+
+console.log(response.output_text); // Convenient aggregated text output
+console.log(response.usage?.total_tokens);
+```
+
+### Streaming responses
+
+```typescript
+const stream = await client.responses.create({
+  model: 'openai/gpt-4o',
+  input: 'Count from 1 to 5.',
+  stream: true,
+});
+
+for await (const event of stream) {
+  if (event.delta) {
+    process.stdout.write(event.delta);
+  }
+}
+```
+
+---
+
 ## Wallet & pricing
 
 ```typescript
 const wallet = await client.wallet();
 const allPricing = await client.pricing();
 const oneModel = await client.pricing('openai/gpt-4o');
+```
+
+---
+
+## Observability & Metrics
+
+The SDK automatically tracks real-time usage statistics and provides structured JSON logging.
+
+### Usage tracking (`client.usage`)
+
+All HTTP requests automatically update in-memory metrics (tokens, latency, error rate):
+
+```typescript
+// View cumulative metrics
+console.log(client.usage.totalRequests);
+console.log(client.usage.totalTokens);
+console.log(client.usage.averageLatencyMs);
+console.log(client.usage.errorRate);
+console.log(client.usage.requestsByModel); // { 'openai/gpt-4o': 5, ... }
+
+// Export as JSON object
+const stats = client.usage.toJSON();
+
+// Reset stats
+client.usage.reset();
+```
+
+### Structured logger (`client.logger`)
+
+Configure log levels (`DEBUG`, `INFO`, `WARNING`, `ERROR`) via options or `RODIUMAI_LOG_LEVEL` environment variable:
+
+```typescript
+const client = new RodiumAI({ logLevel: 'INFO' });
+client.logger.info('Processing started');
 ```
 
 ## Error handling
@@ -528,8 +596,11 @@ try {
 | `transcribe(file, opts?)` | `audio.transcriptions.create(...)` | `POST /v1/audio/transcriptions` |
 | `speech(opts)` → `ArrayBuffer` | `audio.speech.create(...)` | `POST /v1/audio/speech` |
 | `messages(opts)` | `messages.create(...)` | `POST /v1/messages` |
+| `responses(opts)` | `responses.create(...)` | `POST /v1/responses` |
 | `wallet()` | — | `GET /v1/wallet` |
 | `pricing(opts?)` | — | `GET /v1/pricing` |
+| `usage` | `client.usage` (UsageStats) | In-memory metrics & stats |
+| `logger` | `client.logger` (RodiumAILogger) | Structured JSON logger |
 
 Fluent builder: `model()`, `temperature()`, `topP()`, `maxTokens()`, `systemPrompt()`.
 
@@ -581,7 +652,7 @@ Require `rodiumai@^0.3` in your dependencies.
 ## Testing
 
 ```bash
-git clone https://github.com/Docteur-Parfait/rodiumai-js-sdk.git
+git clone https://github.com/jeanpierreaigbede/rodiumai-js-sdk.git
 cd rodiumai-js-sdk
 npm ci
 

@@ -8,6 +8,7 @@ import {
   TimeoutError,
   mapHttpStatus,
 } from './errors.js';
+import type { UsageStats } from './usage.js';
 
 function extractBackendError(data: unknown): { message: string | null; code: string | null } {
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
@@ -60,6 +61,7 @@ export class AsyncHTTPClient {
   private timeout: number;
   private streamTimeout: number;
   private maxRetries: number;
+  private usage?: UsageStats;
 
   constructor({
     apiKey,
@@ -67,12 +69,14 @@ export class AsyncHTTPClient {
     timeout = 30_000,
     streamTimeout = 600_000,
     maxRetries = 3,
+    usage,
   }: {
     apiKey: string;
     baseUrl?: string;
     timeout?: number;
     streamTimeout?: number;
     maxRetries?: number;
+    usage?: UsageStats;
   }) {
     if (baseUrl.startsWith('http://') && !baseUrl.includes('localhost')) {
       throw new Error(
@@ -84,6 +88,7 @@ export class AsyncHTTPClient {
     this.timeout = timeout;
     this.streamTimeout = streamTimeout;
     this.maxRetries = maxRetries;
+    this.usage = usage;
   }
 
   getApiKey(): string {
@@ -155,6 +160,7 @@ export class AsyncHTTPClient {
     const headers = this.getHeaders(opts.extraHeaders);
     const rid = this.requestId();
     let retryCount = 0;
+    const startTime = Date.now();
     const effectiveTimeout = opts.timeout ?? this.timeout;
 
     while (retryCount <= this.maxRetries) {
@@ -201,6 +207,17 @@ export class AsyncHTTPClient {
         }
 
         if (response.status < 400) {
+          const latencyMs = Math.max(0, Date.now() - startTime);
+          const usageData = data.usage as Record<string, number> | undefined;
+          const model = (opts.body?.model as string) ?? (data.model as string) ?? 'auto';
+          this.usage?.recordRequest({
+            success: true,
+            model,
+            endpoint: opts.path,
+            latencyMs,
+            promptTokens: usageData?.prompt_tokens ?? 0,
+            completionTokens: usageData?.completion_tokens ?? 0,
+          });
           return { status: response.status, data, requestId: respRid };
         }
 
@@ -215,6 +232,12 @@ export class AsyncHTTPClient {
           }
         }
 
+        this.usage?.recordRequest({
+          success: false,
+          model: (opts.body?.model as string) ?? 'unknown',
+          endpoint: opts.path,
+          latencyMs: Math.max(0, Date.now() - startTime),
+        });
         throw error;
       } catch (err) {
         clearTimeout(timer);
@@ -226,14 +249,24 @@ export class AsyncHTTPClient {
               await new Promise((r) => setTimeout(r, sleepMs));
               continue;
             }
-            throw err;
           }
-          throw err;
         }
+        this.usage?.recordRequest({
+          success: false,
+          model: (opts.body?.model as string) ?? 'unknown',
+          endpoint: opts.path,
+          latencyMs: Math.max(0, Date.now() - startTime),
+        });
         throw err;
       }
     }
 
+    this.usage?.recordRequest({
+      success: false,
+      model: (opts.body?.model as string) ?? 'unknown',
+      endpoint: opts.path,
+      latencyMs: Math.max(0, Date.now() - startTime),
+    });
     throw new RodiumAIError({ message: 'Request failed after retries', code: 0 });
   }
 
@@ -244,6 +277,7 @@ export class AsyncHTTPClient {
     const url = this.buildUrl(opts.path, opts.params);
     const headers = this.getHeaders({ 'Content-Type': 'application/json', ...opts.extraHeaders });
     const effectiveTimeout = opts.timeout ?? this.timeout;
+    const startTime = Date.now();
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), effectiveTimeout);
 
@@ -260,6 +294,12 @@ export class AsyncHTTPClient {
       clearTimeout(timer);
 
       if (response.status < 400) {
+        this.usage?.recordRequest({
+          success: true,
+          model: (opts.body?.model as string) ?? 'auto',
+          endpoint: opts.path,
+          latencyMs: Math.max(0, Date.now() - startTime),
+        });
         return {
           content: await response.arrayBuffer(),
           contentType: response.headers.get('content-type') ?? 'application/octet-stream',
@@ -270,9 +310,21 @@ export class AsyncHTTPClient {
       const data =
         text && response.headers.get('content-type')?.includes('json') ? JSON.parse(text) : {};
       const rid = response.headers.get('X-Request-ID') ?? this.requestId();
+      this.usage?.recordRequest({
+        success: false,
+        model: (opts.body?.model as string) ?? 'unknown',
+        endpoint: opts.path,
+        latencyMs: Math.max(0, Date.now() - startTime),
+      });
       throw this.mapResponseError(response.status, data, rid, response.headers);
     } catch (err) {
       clearTimeout(timer);
+      this.usage?.recordRequest({
+        success: false,
+        model: (opts.body?.model as string) ?? 'unknown',
+        endpoint: opts.path,
+        latencyMs: Math.max(0, Date.now() - startTime),
+      });
       if (err instanceof DOMException && err.name === 'AbortError') {
         throw new TimeoutError(effectiveTimeout / 1000);
       }

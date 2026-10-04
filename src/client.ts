@@ -102,6 +102,7 @@ export class RodiumAI {
       timeout: this.timeout,
       streamTimeout: this.streamTimeout,
       maxRetries: this.maxRetries,
+      usage: this._usage,
     });
 
     this._extensions = new Extensions(this._http);

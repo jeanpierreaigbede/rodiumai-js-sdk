@@ -119,4 +119,38 @@ describe('AsyncHTTPClient', () => {
       'Bad input'
     );
   });
+
+  it('records requests in UsageStats when provided', async () => {
+    nock(API_BASE)
+      .post('/v1/chat/completions')
+      .reply(
+        200,
+        {
+          id: 'chatcmpl-usage',
+          model: 'auto',
+          usage: { prompt_tokens: 15, completion_tokens: 25, total_tokens: 40 },
+        },
+        { 'X-Request-ID': 'req-usage' }
+      );
+
+    const { UsageStats } = await import('../../src/usage');
+    const usage = new UsageStats();
+    const client = new AsyncHTTPClient({
+      apiKey: 'rdk-test',
+      baseUrl: `${API_BASE}/v1`,
+      usage,
+    });
+
+    await client.request({
+      method: 'POST',
+      path: '/chat/completions',
+      body: { model: 'auto', messages: [{ role: 'user', content: 'hi' }] },
+    });
+
+    expect(usage.totalRequests).toBe(1);
+    expect(usage.successfulRequests).toBe(1);
+    expect(usage.totalPromptTokens).toBe(15);
+    expect(usage.totalCompletionTokens).toBe(25);
+    expect(usage.totalTokens).toBe(40);
+  });
 });

@@ -1,11 +1,13 @@
 # Changelog
 
-## 0.3.1 (2026-08-31)
+## 0.3.1
 
-### Documentation
+### Features & Improvements
 
-- README: full API reference per endpoint (chat/streaming, images, videos, audio, messages, embeddings, wallet/pricing)
-- Examples for image-to-video, inpainting, multimodal chat, real-time SSE loops, function calling
+- **Responses API**: Added OpenAI-compatible `/v1/responses` resource with streaming and text aggregation
+- **Observability**: Automatic in-memory usage tracking (`client.usage`) recording latency, tokens, error rates, and request counts
+- **Test coverage**: Unit tests added for Video generations and Realtime Responses resources (100% passing)
+- **Documentation**: Full API reference in README per endpoint, corrected brand naming to RodiumAI
 
 ## 0.3.0 (2026-08-31)
 
